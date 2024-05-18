@@ -1,2 +1,267 @@
-# Auto detect text files and perform LF normalization
-* text=auto
+class DataBase:
+    users = {} 
+    id_user = 0
+    goods = {}
+    id_good = 0
+
+    def check_username(self, name):
+        for user_id, created_user in self.users.items():
+            if created_user.name == name:
+                return self.users[user_id]
+        return False
+
+    def create_new_user(self, data):
+        new_user = User(name=data['name'], age=data['age'], email=data['email'])
+        self.users[self.id_user] = new_user
+        new_user.id = self.id_user 
+        self.id_user += 1
+        print("You have successfully registered!")
+
+    def delete_user(self, user_id):
+        if user_id in self.users:
+            del self.users[user_id]
+
+    def change_user_info(self, user_id, name='anon', age=25, email='fake@mail.com'):
+        if user_id in self.users:
+            self.users[user_id].change_data(name, age, email)
+
+    def add_new_good(self, name, quantity, price):
+        self.goods[self.id_good] = Goods(name, quantity, price)
+        self.id_good += 1
+
+    def delete_good(self, name):
+        for good_id, good in self.goods.items():
+            if good.name == name:
+                del self.goods[good_id]
+                return
+        print("The specified item was not found.")
+
+    def display_goods(self):
+        print("List of Goods:")
+        for good_id, good in self.goods.items():
+            print(f"ID: {good_id}, Name: {good.name}, Quantity: {good.quantity}, Price: {good.price}")
+
+    def purchase_good(self, user_id, good_id, quantity):
+        if user_id in self.users and good_id in self.goods:
+            user = self.users[user_id]
+            good = self.goods[good_id]
+            total_cost = good.price * quantity
+            if user.money >= total_cost and good.quantity >= quantity:
+                user.spend_money(total_cost)
+                good.quantity -= quantity
+                print("Purchase successful!")
+            else:
+                print("Insufficient funds or quantity not available.")
+        else:
+            print("User or good not found.")
+
+    def check_balance(self, user_id):
+        if user_id in self.users:
+            print(f"Your current balance is: {self.users[user_id].money}")
+        else:
+            print("User not found.")
+
+    def add_money(self, user_id, amount):
+        if user_id in self.users:
+            self.users[user_id].put_money_on_wallet(amount)
+            print(f"{amount} added to your account.")
+        else:
+            print("User not found.")
+
+
+class User:
+    def __init__(self, name='anon', age=25, email='fake@mail.com', money=0):
+        self.name = name
+        self.age = age
+        self.email = email
+        self.money = money
+        self.cart = {}  
+
+    def change_data(self, name='anon', age=25, email='fake@mail.com'):
+        self.name = name
+        self.age = age
+        self.email = email
+
+    def put_money_on_wallet(self, amount):
+        self.money += amount
+
+    def spend_money(self, amount):
+        if amount <= self.money:
+            self.money -= amount
+
+    def add_to_cart(self, good_id, quantity):
+        if good_id in self.cart:
+            self.cart[good_id] += quantity
+        else:
+            self.cart[good_id] = quantity
+
+    def purchase_cart(self, database):
+        total_cost = 0
+        for good_id, quantity in self.cart.items():
+            if good_id in database.goods:
+                good = database.goods[good_id]
+                total_cost += good.price * quantity
+                if good.quantity < quantity:
+                    print(f"Not enough {good.name} available.")
+                    return False
+            else:
+                print("Item not found in database.")
+                return False
+
+        if total_cost > self.money:
+            print("Insufficient funds to purchase items in cart.")
+            return False
+
+        for good_id, quantity in self.cart.items():
+            good = database.goods[good_id]
+            good.quantity -= quantity
+
+        self.money -= total_cost
+        self.cart.clear()
+        print("Purchase successful!")
+        return True
+
+
+class Goods:
+    def __init__(self, name, quantity, price):
+        self.name = name
+        self.quantity = quantity
+        self.price = price
+
+
+class Interface:
+    user = None
+    user_id = None  
+
+    command_list = 'to log in: login\nto log out: logout\nto create account: create account\nto change info: change info\nto delete account: delete account\nto add new good: add good\nto delete good: delete good\nto display goods: display goods\nto add to cart: add to cart\nto display cart: display cart\nto purchase cart: purchase cart\nto check balance: check balance\nto add money: add money\nto exit: exit'
+
+    def __init__(self, database):
+        self.db = database
+
+    def _greeting(self):
+        if self.user is None:
+            print('Hello, user, please, sign in')
+        else:
+            print('Hello,', self.user.name)
+        print(self.command_list)
+
+    def _login(self, name=''):
+        if name == '':
+            name = input('please, enter name: ')
+        result = self.db.check_username(name)
+        if result:
+            self.user = result
+            self.user_id = result.id
+        else:
+            print('no user found, please create account')
+
+    def await_orders(self):
+        work = 1
+        self._greeting()
+
+        while work:
+            command = input()
+
+            if command == 'exit':
+                work = 0
+                print('You`re out')
+
+            if command == 'login':
+                self._login()
+
+            if command == 'create account':
+                data = {'name': input('enter name: '), 'age': int(input('enter age: ')), 'email': input('enter email: ')}
+                self.db.create_new_user(data)
+                self._login(data['name'])
+
+            if command == 'logout':
+                self.user = None
+                self.user_id = None 
+
+            if command == 'change info':
+                if self.user:
+                    new_name = input('Enter new name (leave empty to keep current): ')
+                    new_age = int(input('Enter new age (leave empty to keep current): '))
+                    new_email = input('Enter new email (leave empty to keep current): ')
+                    self.db.change_user_info(self.user_id, new_name, new_age, new_email)
+                    print('You have changed your information.')
+                else:
+                    print('You need to be logged in to change user info.')
+
+            if command == 'delete account':
+                if self.user:
+                    confirm = input('Are you sure you want to delete your account? (yes/no): ')
+                    if confirm.lower() == 'yes':
+                        self.db.delete_user(self.user_id)
+                        self.user = None
+                        self.user_id = None  
+                        print('Account deleted successfully.')
+                else:
+                    print('You need to be logged in to delete an account.')
+
+            if command == 'add good':
+                if self.user:
+                    name = input('Enter the name of the new good: ')
+                    quantity = int(input('Enter the quantity of the new good: '))
+                    price = float(input('Enter the price of the new good: '))
+                    self.db.add_new_good(name, quantity, price)
+                    print('New good added successfully.')
+                else:
+                    print('You need to be logged in to add a new good.')
+
+            if command == 'delete good':
+                if self.user:
+                    name = input('Enter the name of the good to delete: ')
+                    self.db.delete_good(name)
+                    print('Good deleted successfully.')
+                else:
+                    print('You need to be logged in to delete a good.')
+
+            if command == 'display goods':
+                self.db.display_goods()
+
+            if command == 'add to cart':
+                if self.user:
+                    good_id = int(input('Enter the ID of the good to add to cart: '))
+                    quantity = int(input('Enter the quantity to add to cart: '))
+                    self.user.add_to_cart(good_id, quantity)
+                    print('Good added to cart.')
+                else:
+                    print('You need to be logged in to add to cart.')
+
+            if command == 'display cart':
+                if self.user:
+                    print("Cart contents:")
+                    for good_id, quantity in self.user.cart.items():
+                        print(f"Good ID: {good_id}, Quantity: {quantity}")
+                else:
+                    print('You need to be logged in to display your cart.')
+
+            if command == 'purchase cart':
+                if self.user:
+                    success = self.user.purchase_cart(self.db)
+                    if success:
+                        print("Cart purchased successfully.")
+                    else:
+                        print("Failed to purchase cart.")
+                else:
+                    print('You need to be logged in to purchase your cart.')
+
+            if command == 'check balance':
+                if self.user:
+                    self.db.check_balance(self.user_id)
+                else:
+                    print('You need to be logged in to check your balance.')
+
+            if command == 'add money':
+                if self.user:
+                    amount = float(input('Enter the amount to add: '))
+                    self.db.add_money(self.user_id, amount)
+                else:
+                    print('You need to be logged in to add money to your account.')
+
+
+db = DataBase()
+interface = Interface(db)
+interface.await_orders()
+
